@@ -1,0 +1,57 @@
+name: Build ws branches and Release
+
+on:
+  push:
+    branches: [ ws ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Build with Gradle
+        run: chmod +x gradlew && ./gradlew clean shadowJar
+
+      - name: Prepare JAR
+        id: prepare_jar
+        run: |
+          JAR_PATH=$(find build/libs -name "*.jar" ! -name "*sources*" ! -name "*javadoc*" | head -n 1)
+          cp "$JAR_PATH" ./server.jar
+          echo "JAR_SIZE=$(ls -lh ./server.jar | awk '{print $5}')" >> $GITHUB_OUTPUT
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: NanoLimbo-artifact
+          path: server.jar
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write 
+    steps:
+      - name: Download Artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: NanoLimbo-artifact
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "server.jar"
+          tag: "ws-latest"
+          name: "NanoLimbo ws-latest"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          allowUpdates: true
+          replacesArtifacts: true
+          body: "Automated ws branch build #${{ github.run_number }}"

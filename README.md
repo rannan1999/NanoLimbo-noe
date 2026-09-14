@@ -2,7 +2,7 @@
 
 ### 自动构建server.jar指南
 
-1：fork本项目
+1：点击Use this template ➡ Create a new repostory 创建一个私密项目
 
 2：在Actions菜单允许 `I understand my workflows, go ahead and enable them` 按钮
 
