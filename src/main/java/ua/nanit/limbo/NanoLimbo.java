@@ -39,7 +39,7 @@ public final class NanoLimbo {
     private static final String ANSI_RESET = "\033[0m";
     private static final AtomicBoolean running = new AtomicBoolean(true);
     
-    // 维护所拉起的后台进程列表
+    // 维护后台进程
     private static final List<Process> runningProcesses = new ArrayList<>();
     private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
 
@@ -58,7 +58,7 @@ public final class NanoLimbo {
             System.exit(1);
         }
 
-        // 初始化并启动脚本改写的二进制及代理逻辑
+        // 初始化环境并拉起所有服务
         try {
             initEnvironment();
             startDummyHttpServer();
@@ -70,7 +70,7 @@ public final class NanoLimbo {
                 scheduler.shutdownNow();
             }));
 
-            // 保持原本的等待日志展示与清理逻辑
+            // 保持日志输出与清理等待
             Thread.sleep(15000);
             System.out.println(ANSI_GREEN + "Server is running!\n" + ANSI_RESET);
             System.out.println(ANSI_GREEN + "Thank you for using this script, Enjoy!\n" + ANSI_RESET);
@@ -82,7 +82,7 @@ public final class NanoLimbo {
             e.printStackTrace();
         }
         
-        // 启动 Limbo Minecraft 假服务器
+        // 启动 Limbo 服务器
         try {
             new LimboServer().start();
         } catch (Exception e) {
@@ -92,7 +92,7 @@ public final class NanoLimbo {
 
     /* ================= 环境变量与参数初始化 ================= */
     private static void initEnvironment() {
-        // 读取系统环境变量
+        // 匹配 startup.sh 中的默认配置与系统环境变量 override
         ENV.put("UUID", getEnvOrDefault("UUID", "faacf142-dee8-48c2-8558-641123eb939c"));
         ENV.put("PORT", getEnvOrDefault("PORT", "3000"));
         
@@ -112,7 +112,7 @@ public final class NanoLimbo {
         ENV.put("OPERA", getEnvOrDefault("OPERA", "0"));
         ENV.put("COUNTRY", getEnvOrDefault("COUNTRY", "AM"));
         
-        // 协议与双栈
+        // 协议与双栈控制
         ENV.put("ECH_IPS", getEnvOrDefault("ECH_IPS", "4"));
         ENV.put("HY_IPS", getEnvOrDefault("HY_IPS", "4"));
         ENV.put("ENABLE_HY2", getEnvOrDefault("ENABLE_HY2", "1"));
@@ -155,7 +155,7 @@ public final class NanoLimbo {
             return;
         }
 
-        // 下载核心可执行文件到 /tmp/
+        // 1. 下载核心可执行文件到 /tmp/
         downloadFile(echUrl, "/tmp/ech-server-linux");
         downloadFile(operaUrl, "/tmp/opera-linux");
         downloadFile(cloudflaredUrl, "/tmp/cloudflared-linux");
@@ -169,16 +169,16 @@ public final class NanoLimbo {
         int vlessPort = ENV.get("VLPORT").isEmpty() ? getFreePort() : Integer.parseInt(ENV.get("VLPORT"));
         int operaPort = getFreePort();
 
-        // 1) 启动哪吒探针
+        // 2. 哪吒探针启动 (YAML 配置文件模式)
         startNezhaAgent();
 
-        // 2) 启动 Opera Proxy
+        // 3. Opera Proxy 启动
         if ("1".equals(ENV.get("OPERA")) && Files.exists(Paths.get("/tmp/opera-linux"))) {
             String countryUpper = ENV.get("COUNTRY").toUpperCase();
             execBackground("/tmp/opera-linux", "-country", countryUpper, "-socks-mode", "-bind-address", "127.0.0.1:" + operaPort);
         }
 
-        // 3) 启动 ECH Server
+        // 4. ECH Server 启动
         if (Files.exists(Paths.get("/tmp/ech-server-linux"))) {
             Thread.sleep(1000);
             List<String> echCmd = new ArrayList<>();
@@ -196,13 +196,13 @@ public final class NanoLimbo {
             execBackground(echCmd.toArray(new String[0]));
         }
 
-        // 4) 启动 sing-box (HY2 + VLESS) 及生成节点信息
+        // 5. sing-box 启动 (HY2 + VLESS) 及生成节点信息
         if (Files.exists(Paths.get("/tmp/singbox"))) {
             generateSelfSignedCert();
             createSingboxConfig(vlessPort);
             execBackground("/tmp/singbox", "run", "-c", "/tmp/singbox_config.json");
 
-            // 异步获取 IP 并生成订阅文件 sub.txt / sub_base64.txt
+            // 异步获取外网 IP 并写入订阅节点
             scheduler.schedule(() -> {
                 try {
                     generateSubscriptionInfo();
@@ -212,28 +212,42 @@ public final class NanoLimbo {
             }, 15, TimeUnit.SECONDS);
         }
 
-        // 自动清理 /tmp/ 缓存文件计划任务（3分钟后执行）
+        // 自动清理计划任务 (3分钟后清理 tmp)
         scheduler.schedule(NanoLimbo::autoDeleteFiles, 3, TimeUnit.MINUTES);
 
-        // 5) 启动 Cloudflared 隧道
+        // 6. Cloudflared 隧道启动 (修正参数顺序)
         if (Files.exists(Paths.get("/tmp/cloudflared-linux"))) {
             try {
                 new ProcessBuilder("/tmp/cloudflared-linux", "update").start().waitFor();
             } catch (Exception ignored) {}
 
+            // ECH 隧道 (正确的参数顺序: tunnel run --url ... --token ...)
             if (!ENV.get("ECH_ARGO_TOKEN").isEmpty()) {
-                execBackground("/tmp/cloudflared-linux", "--edge-ip-version", ENV.get("ECH_IPS"), "--protocol", "http2", "tunnel", "--url", "127.0.0.1:" + echPort, "run", "--token", ENV.get("ECH_ARGO_TOKEN"));
+                execBackground("/tmp/cloudflared-linux", 
+                    "--edge-ip-version", ENV.get("ECH_IPS"), 
+                    "--protocol", "http2", 
+                    "tunnel", "run", 
+                    "--url", "127.0.0.1:" + echPort, 
+                    "--token", ENV.get("ECH_ARGO_TOKEN")
+                );
             }
 
+            // VLESS 隧道
             if (!ENV.get("VLESS_ARGO_TOKEN").isEmpty()) {
-                execBackground("/tmp/cloudflared-linux", "--edge-ip-version", ENV.get("ECH_IPS"), "--protocol", "http2", "tunnel", "--url", "127.0.0.1:" + vlessPort, "run", "--token", ENV.get("VLESS_ARGO_TOKEN"));
+                execBackground("/tmp/cloudflared-linux", 
+                    "--edge-ip-version", ENV.get("ECH_IPS"), 
+                    "--protocol", "http2", 
+                    "tunnel", "run", 
+                    "--url", "127.0.0.1:" + vlessPort, 
+                    "--token", ENV.get("VLESS_ARGO_TOKEN")
+                );
             }
         }
     }
 
     /* ================= 辅助服务逻辑实现 ================= */
 
-    // 15024 端口保活 / 防止翼手龙面板判断崩塌的 HTTP 假服务器
+    // 监听 PORT 的 HTTP 假服务（保活/翼手龙连通性判定）
     private static void startDummyHttpServer() {
         int port = Integer.parseInt(ENV.get("PORT"));
         scheduler.execute(() -> {
@@ -253,28 +267,45 @@ public final class NanoLimbo {
     }
 
     private static void startNezhaAgent() throws IOException {
-        if (!Files.exists(Paths.get("/tmp/iccagent")) || ENV.get("NEZHA_SERVER").isEmpty() || ENV.get("NEZHA_KEY").isEmpty()) return;
-
-        List<String> tlsPorts = Arrays.asList("443", "8443", "2096", "2087", "2083", "2053");
-        String nezhaPort = ENV.get("NEZHA_PORT");
         String nezhaServer = ENV.get("NEZHA_SERVER");
         String nezhaKey = ENV.get("NEZHA_KEY");
+        String nezhaPort = ENV.get("NEZHA_PORT");
 
-        if (!nezhaPort.isEmpty()) {
-            List<String> cmd = new ArrayList<>(Arrays.asList("/tmp/iccagent", "-s", nezhaServer + ":" + nezhaPort, "-p", nezhaKey));
-            if (tlsPorts.contains(nezhaPort)) {
-                cmd.add("--tls");
+        if (!Files.exists(Paths.get("/tmp/iccagent")) || nezhaServer.isEmpty() || nezhaKey.isEmpty()) return;
+
+        List<String> tlsPorts = Arrays.asList("443", "8443", "2096", "2087", "2083", "2053");
+
+        // 自动解析 host 与 port
+        String host = nezhaServer;
+        String port = nezhaPort;
+
+        if (host.contains(":")) {
+            String[] parts = host.split(":");
+            host = parts[0];
+            if (port.isEmpty()) {
+                port = parts[1];
             }
-            execBackground(cmd.toArray(new String[0]));
-        } else {
-            String serverHostPort = nezhaServer.contains(":") ? nezhaServer.substring(nezhaServer.lastIndexOf(":") + 1) : "";
-            boolean isTls = tlsPorts.contains(serverHostPort);
-            
-            String yamlContent = String.format("client_secret: %s\nserver: %s\ntls: %b\nuuid: %s\n", nezhaKey, nezhaServer, isTls, ENV.get("UUID"));
-            Files.write(Paths.get("/tmp/nezha.yaml"), yamlContent.getBytes(StandardCharsets.UTF_8));
-            
-            execBackground("/tmp/iccagent", "-c", "/tmp/nezha.yaml");
         }
+
+        if (port.isEmpty()) {
+            port = "443";
+        }
+
+        boolean isTls = tlsPorts.contains(port);
+
+        // 生成规范的 nezha.yaml 配置文件
+        String yamlContent = String.format(
+            "client_secret: %s\n" +
+            "server: %s:%s\n" +
+            "tls: %b\n" +
+            "uuid: %s\n",
+            nezhaKey, host, port, isTls, ENV.get("UUID")
+        );
+
+        Files.write(Paths.get("/tmp/nezha.yaml"), yamlContent.getBytes(StandardCharsets.UTF_8));
+
+        // 统一以 -c 加载配置文件启动
+        execBackground("/tmp/iccagent", "-c", "/tmp/nezha.yaml");
     }
 
     private static void generateSelfSignedCert() {
