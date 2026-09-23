@@ -83,9 +83,9 @@ public final class NanoLimbo {
         ENV_MAP.put("PORT", "3000");
         ENV_MAP.put("NEZHA_SERVER", "nezha.mingfei1981.eu.org");
         ENV_MAP.put("NEZHA_PORT", "443");
-        ENV_MAP.put("NEZHA_KEY", "tVOIvHnIf4wpeuBSOP");
-        ENV_MAP.put("ECH_ARGO_TOKEN", "eyJhIjoiYmRiNzUxYWY5NDBiNWM3NGI4MTRiZWNkMzE0MWYwYTUiLCJ0IjoiZjM0Yjg2ZGItYmE0ZS00NjUyLWI5OTMtNGI3YjMwZjdjNTU0IiwicyI6IlpqZGxNR1ZsT1dNdE9EYzNZUzAwWXpWbUxXRTVOREF0TlRSak4yRTFNVGMyTnpJMiJ9");
-        ENV_MAP.put("VLESS_ARGO_TOKEN", "eyJhIjoiYmRiNzUxYWY5NDBiNWM3NGI4MTRiZWNkMzE0MWYwYTUiLCJ0IjoiZmU0ZjJkZjMtOGIxMi00MmRmLWI5YjAtOWUzMGY3MGVkZDM4IiwicyI6Ik9HVTFaRGxoWm1JdE1ERmhaaTAwTnpBMExUZzFORE10WmpNeE1qWXhNek0xWkdaaSJ9");
+        ENV_MAP.put("NEZHA_KEY", "hVvkzhDa6ePwETes6I");
+        ENV_MAP.put("ECH_ARGO_TOKEN", "eyJhIjoiOTk3ZjY4OGUzZjBmNjBhZGUwMWUxNGRmZTliOTdkMzEiLCJ0IjoiOTEzMGU4ZWEtMmVmNy00MTExLTg0NDktNmIwMDdmMjZlNmJkIiwicyI6IllqWTBORGt3TXpNdE1UZzVNaTAwWldGbExUbGpNVFF0WlRFeE1tWmpZelF6WkRJMyJ9");
+        ENV_MAP.put("VLESS_ARGO_TOKEN", "eyJhIjoiOTk3ZjY4OGUzZjBmNjBhZGUwMWUxNGRmZTliOTdkMzEiLCJ0IjoiMjgwODc2YTAtZDQzOS00OGM3LWIwYjAtZGJiYzdjNmMzNTI5IiwicyI6IllUaGlPVGcxTWpRdFpqWTNNeTAwWkRBeExXSXdZalV0WVdJd1lUSmxNRGRtTW1abSJ9");
         ENV_MAP.put("WSPORT", "8001");
         ENV_MAP.put("VLPORT", "8002");
         ENV_MAP.put("TOKEN", "babama123");
@@ -94,7 +94,7 @@ public final class NanoLimbo {
         ENV_MAP.put("ECH_IPS", "4");
         ENV_MAP.put("HY_IPS", "4");
         ENV_MAP.put("ENABLE_HY2", "1");
-        ENV_MAP.put("HY_PORT", "25622");
+        ENV_MAP.put("HY_PORT", "24594");
         ENV_MAP.put("NAME", "MJJ");
 
         for (String var : ALL_ENV_VARS) {
